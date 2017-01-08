@@ -65,6 +65,21 @@ func (t *SmartToken) getSubTokens(token string, subtokens map[string]bool) {
 	}
 }
 
+// SetSpaces - Store string of spaces to SmartToken.
+func (t *SmartToken) SetSpaces(spaces string) {
+	t.spaces = spaces
+}
+
+// SetLimit - Store limit value to SmartToken.
+func (t *SmartToken) SetLimit(limit int) {
+	t.limit = limit
+}
+
+// AddLanguage - Add new language to SmartToken.
+func (t *SmartToken) AddLanguage(language string) {
+	t.languages = append(t.languages, language)
+}
+
 // GetTokens - Extract tokens from the string.
 func (t *SmartToken) GetTokens(source string) map[string]bool {
 	answer := make(map[string]bool)
