@@ -1,93 +1,87 @@
 package gotoken
 
-import (
-	"strings"
-	"unicode/utf8"
-)
+import "unicode"
 
-// SmartToken - Tokenizer for "SmartToken" algorithm.
+const runeClassUndef = -1
+const runeClassLetter = 0
+const runeClassDigit = 1
+const runeClassPunct = 2
+
 type SmartToken struct {
-	spaces    string
-	languages []string
-	limit     int
+	rangeTableList  []*unicode.RangeTable
+	rangeTableIndex int
+	runeClass       int
 }
 
-const undefinedLanguage = -2
-const unidentifiedLanguage = -1
+func (st *SmartToken) AddRangeTable(rt *unicode.RangeTable) {
+	st.rangeTableList = append(st.rangeTableList, rt)
+}
 
-func (t *SmartToken) getLanguage(r rune) int {
-	for position, language := range t.languages {
-		if strings.ContainsRune(language, r) {
-			return position
+func (st *SmartToken) flush() {
+	st.runeClass = runeClassUndef
+	st.rangeTableIndex = -1
+}
+
+func (st *SmartToken) getRuneClass(r rune) int {
+	switch {
+	case unicode.IsLetter(r):
+		return runeClassLetter
+	case unicode.IsDigit(r):
+		return runeClassDigit
+	case unicode.IsPunct(r):
+		return runeClassPunct
+	}
+	return runeClassUndef
+}
+
+func (st *SmartToken) getTableIndex(r rune) int {
+	for index, rangeTable := range st.rangeTableList {
+		if unicode.In(r, rangeTable) {
+			return index
 		}
 	}
-	return unidentifiedLanguage
+	return -1
 }
 
-func (t *SmartToken) getSubTokensLightweight(token []rune, subtokens map[string]bool) {
-	currentLanguage := undefinedLanguage
-	startPosition := -1
-	for position, r := range token {
-		detectedLanguage := t.getLanguage(r)
-		if detectedLanguage != currentLanguage {
-			if startPosition != -1 {
-				subtokens[string(token[startPosition:position])] = true
-			}
-			startPosition = position
-			currentLanguage = detectedLanguage
+func (st *SmartToken) pushRune(r rune) bool {
+	result := false
+	newRuneClass := st.getRuneClass(r)
+	if newRuneClass == runeClassLetter {
+		newRangeTableIndex := st.getTableIndex(r)
+		if newRangeTableIndex != st.rangeTableIndex {
+			st.rangeTableIndex = newRangeTableIndex
+			result = true
 		}
 	}
-	subtokens[string(token[startPosition:])] = true
+	if newRuneClass != st.runeClass {
+		st.runeClass = newRuneClass
+		result = true
+	}
+	return result
 }
 
-func (t *SmartToken) getSubTokensRegular(token []rune, subtokens map[string]bool) {
-	if len(token) != 0 {
-		currentLanguage := undefinedLanguage
-		for position, r := range token {
-			detectedLanguage := t.getLanguage(r)
-			if detectedLanguage != currentLanguage {
-				subtokens[string(token[:position])] = true
-				if currentLanguage != -2 {
-					t.getSubTokensRegular(token[position:], subtokens)
+func (st *SmartToken) GetSubtokensWithDepth(token string, depth int) map[string]bool {
+	st.flush()
+	subTokens := make(map[string]bool)
+	cb := makeCircularBuffer(depth + 1)
+	for index, r := range token {
+		if st.pushRune(r) {
+			cb.push(index)
+			if cb.full() {
+				left, rightArray := cb.extract()
+				for _, right := range rightArray {
+					subTokens[token[left:right]] = true
 				}
-				currentLanguage = detectedLanguage
 			}
 		}
-		subtokens[string(token)] = true
 	}
-}
-
-func (t *SmartToken) getSubTokens(token string, subtokens map[string]bool) {
-	if utf8.RuneCountInString(token) > t.limit {
-		t.getSubTokensLightweight([]rune(token), subtokens)
-	} else {
-		t.getSubTokensRegular([]rune(token), subtokens)
+	cb.push(len(token))
+	for !cb.empty() {
+		left, rightArray := cb.extract()
+		for _, right := range rightArray {
+			subTokens[token[left:right]] = true
+		}
+		cb.pop()
 	}
-}
-
-// SetSpaces - Store string of spaces to SmartToken.
-func (t *SmartToken) SetSpaces(spaces string) {
-	t.spaces = spaces
-}
-
-// SetLimit - Store limit value to SmartToken.
-func (t *SmartToken) SetLimit(limit int) {
-	t.limit = limit
-}
-
-// AddLanguage - Add new language to SmartToken.
-func (t *SmartToken) AddLanguage(language string) {
-	t.languages = append(t.languages, language)
-}
-
-// GetTokens - Extract tokens from the string.
-func (t *SmartToken) GetTokens(source string) map[string]bool {
-	answer := make(map[string]bool)
-	tokens := strings.FieldsFunc(source, func(r rune) bool {
-		return strings.ContainsRune(t.spaces, r)
-	})
-	for _, token := range tokens {
-		t.getSubTokens(token, answer)
-	}
-	return answer
+	return subTokens
 }
