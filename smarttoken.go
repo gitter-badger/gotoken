@@ -26,8 +26,7 @@ type SmartToken struct {
 	rangeTableList  []*unicode.RangeTable
 	rangeTableIndex int
 	runeClass       int
-
-	policy []int
+	policy          []int
 }
 
 // AddRangeTable pushes new language into tokenizer.

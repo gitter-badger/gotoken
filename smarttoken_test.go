@@ -41,14 +41,19 @@ type tokenizerTestSet struct {
 	output map[string]int
 }
 
-func TestTokenizeStringDepthPolicy(t *testing.T) {
+func runTokenizerTestSetDepth(testSet []tokenizerTestSet, t *testing.T) {
 	ga := goassert.New(t)
-
 	var st SmartToken
 	st.AddRangeTable(unicode.Latin)
 	st.AddRangeTable(unicode.Cyrillic)
 	st.SetDepthPolicy(10, 10, 18, 2)
+	for _, test := range testSet {
+		result := st.TokenizeString(test.input)
+		ga.Assert(reflect.DeepEqual(result, test.output), fmt.Sprintf("wrong tokenization of '%v' -> %v", test.input, result))
+	}
+}
 
+func TestTokenizerSimple(t *testing.T) {
 	testSet := []tokenizerTestSet{
 		tokenizerTestSet{
 			input: "hello", // Single word.
@@ -63,6 +68,12 @@ func TestTokenizeStringDepthPolicy(t *testing.T) {
 				"world": 0,
 			},
 		},
+	}
+	runTokenizerTestSetDepth(testSet, t)
+}
+
+func TestTokenizerTransitions(t *testing.T) {
+	testSet := []tokenizerTestSet{
 		tokenizerTestSet{ // KnownLanguage -> KnownLanguage.
 			input: "helloпривет",
 			output: map[string]int{
@@ -85,18 +96,6 @@ func TestTokenizeStringDepthPolicy(t *testing.T) {
 				"你好":       0,
 				"привет":   0,
 				"你好привет": 1,
-			},
-		},
-		tokenizerTestSet{ // Similar language separation.
-			input: "aаaа",
-			output: map[string]int{
-				"a":    0,
-				"а":    0,
-				"aа":   1,
-				"аa":   1,
-				"aаa":  2,
-				"аaа":  2,
-				"aаaа": 3,
 			},
 		},
 		tokenizerTestSet{
@@ -195,6 +194,24 @@ func TestTokenizeStringDepthPolicy(t *testing.T) {
 				"☭...": 1,
 			},
 		},
+	}
+	runTokenizerTestSetDepth(testSet, t)
+}
+
+func TestTokenizerLanguages(t *testing.T) {
+	testSet := []tokenizerTestSet{
+		tokenizerTestSet{ // Similar language separation.
+			input: "aаaа",
+			output: map[string]int{
+				"a":    0,
+				"а":    0,
+				"aа":   1,
+				"аa":   1,
+				"aаa":  2,
+				"аaа":  2,
+				"aаaа": 3,
+			},
+		},
 		tokenizerTestSet{
 			input: "你好。再见。", // Chinese punctuation.
 			output: map[string]int{
@@ -209,6 +226,12 @@ func TestTokenizeStringDepthPolicy(t *testing.T) {
 				"你好。再见。": 3,
 			},
 		},
+	}
+	runTokenizerTestSetDepth(testSet, t)
+}
+
+func TestTokenizerDepth(t *testing.T) {
+	testSet := []tokenizerTestSet{
 		tokenizerTestSet{
 			input: "a.b.c.d", // Left side.
 			output: map[string]int{
@@ -285,9 +308,5 @@ func TestTokenizeStringDepthPolicy(t *testing.T) {
 			},
 		},
 	}
-
-	for _, test := range testSet {
-		result := st.TokenizeString(test.input)
-		ga.Assert(reflect.DeepEqual(result, test.output), fmt.Sprintf("wrong tokenization of '%v' -> %v", test.input, result))
-	}
+	runTokenizerTestSetDepth(testSet, t)
 }
