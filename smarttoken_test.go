@@ -41,7 +41,7 @@ type tokenizerTestSet struct {
 	output map[string]int
 }
 
-func TestTokenizeString(t *testing.T) {
+func TestTokenizeStringDepthPolicy(t *testing.T) {
 	ga := goassert.New(t)
 
 	var st SmartToken
