@@ -196,6 +196,20 @@ func TestTokenizeStringDepthPolicy(t *testing.T) {
 			},
 		},
 		tokenizerTestSet{
+			input: "你好。再见。", // Chinese punctuation.
+			output: map[string]int{
+				"你好":     0,
+				"再见":     0,
+				"。":      0,
+				"你好。":    1,
+				"再见。":    1,
+				"。再见":    1,
+				"你好。再见":  2,
+				"。再见。":   2,
+				"你好。再见。": 3,
+			},
+		},
+		tokenizerTestSet{
 			input: "a.b.c.d", // Left side.
 			output: map[string]int{
 				"a":       0,

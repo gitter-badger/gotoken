@@ -1,6 +1,9 @@
 package gotoken
 
-import "unicode"
+import (
+	"unicode"
+	"unicode/utf8"
+)
 
 const runeClassUndef = -1
 const runeClassLetter = 0
@@ -53,9 +56,8 @@ func (st *SmartToken) getDepth(length int) int {
 			(st.policy[indexMaxDepth]-st.policy[indexMinDepth])*
 				(st.policy[indexMinLength]-length)/
 				(st.policy[indexMinLength]-st.policy[indexMaxLength])
-	} else {
-		return length
 	}
+	return length
 }
 
 func (st *SmartToken) flush() {
@@ -87,6 +89,7 @@ func (st *SmartToken) getTableIndex(r rune) int {
 func (st *SmartToken) pushRune(r rune) bool {
 	result := false
 	newRuneClass := st.getRuneClass(r)
+
 	if newRuneClass == runeClassLetter {
 		newRangeTableIndex := st.getTableIndex(r)
 		if newRangeTableIndex != st.rangeTableIndex {
@@ -103,7 +106,7 @@ func (st *SmartToken) pushRune(r rune) bool {
 
 func (st *SmartToken) getSubtokens(token string, tokens map[string]int, distribution map[int]int) {
 	st.flush()
-	cb := makeCircularBuffer(st.getDepth(len(token)) + 1)
+	cb := makeCircularBuffer(st.getDepth(utf8.RuneCountInString(token)) + 1)
 	for index, r := range token {
 		if st.pushRune(r) {
 			cb.push(index)
