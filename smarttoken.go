@@ -89,7 +89,7 @@ func (st *SmartToken) pushRune(r rune) bool {
 	return result
 }
 
-func (st *SmartToken) getSubtokensWithDepth(token string, tokens map[string]bool) {
+func (st *SmartToken) getSubtokensWithDepth(token string, tokens map[string]int) {
 	st.flush()
 	cb := makeCircularBuffer(st.getDepth(len(token)) + 1)
 	for index, r := range token {
@@ -97,8 +97,8 @@ func (st *SmartToken) getSubtokensWithDepth(token string, tokens map[string]bool
 			cb.push(index)
 			if cb.full() {
 				left, rightArray := cb.extract()
-				for _, right := range rightArray {
-					tokens[token[left:right]] = true
+				for depth, right := range rightArray {
+					tokens[token[left:right]] = depth
 				}
 			}
 		}
@@ -106,16 +106,16 @@ func (st *SmartToken) getSubtokensWithDepth(token string, tokens map[string]bool
 	cb.push(len(token))
 	for !cb.empty() {
 		left, rightArray := cb.extract()
-		for _, right := range rightArray {
-			tokens[token[left:right]] = true
+		for depth, right := range rightArray {
+			tokens[token[left:right]] = depth
 		}
 		cb.pop()
 	}
 }
 
 // TokenizeString starts SmartToken tokenization process on a string.
-func (st *SmartToken) TokenizeString(source string) map[string]bool {
-	tokens := make(map[string]bool)
+func (st *SmartToken) TokenizeString(source string) map[string]int {
+	tokens := make(map[string]int)
 
 	const stateSpace = 0
 	const stateToken = 1
