@@ -6,15 +6,44 @@ const runeClassUndef = -1
 const runeClassLetter = 0
 const runeClassDigit = 1
 const runeClassPunct = 2
+const runeClassOther = 3
 
+const policyDepth = 0
+
+const indexMaxLength = 1
+const indexMaxDepth = 2
+const indexMinLength = 3
+const indexMinDepth = 4
+
+// SmartToken is a tokenizer for SmartToken algorithm.
 type SmartToken struct {
 	rangeTableList  []*unicode.RangeTable
 	rangeTableIndex int
 	runeClass       int
+
+	policy []int
 }
 
+// AddRangeTable pushes new language into tokenizer.
 func (st *SmartToken) AddRangeTable(rt *unicode.RangeTable) {
 	st.rangeTableList = append(st.rangeTableList, rt)
+}
+
+// SetDepthPolicy tells tokenizer to use depth-based tokenizarion policy.
+func (st *SmartToken) SetDepthPolicy(maxLength int, maxDepth int, minLength int, minDepth int) {
+	st.policy = []int{policyDepth, maxLength, maxDepth, minLength, minDepth}
+}
+
+func (st *SmartToken) getDepth(length int) int {
+	if length <= st.policy[indexMaxLength] {
+		return st.policy[indexMaxDepth]
+	} else if length >= st.policy[indexMinLength] {
+		return st.policy[indexMinDepth]
+	}
+	return st.policy[indexMinDepth] +
+		(st.policy[indexMaxDepth]-st.policy[indexMinDepth])*
+			(st.policy[indexMinLength]-length)/
+			(st.policy[indexMinLength]-st.policy[indexMaxLength])
 }
 
 func (st *SmartToken) flush() {
@@ -31,7 +60,7 @@ func (st *SmartToken) getRuneClass(r rune) int {
 	case unicode.IsPunct(r):
 		return runeClassPunct
 	}
-	return runeClassUndef
+	return runeClassOther
 }
 
 func (st *SmartToken) getTableIndex(r rune) int {
@@ -60,17 +89,16 @@ func (st *SmartToken) pushRune(r rune) bool {
 	return result
 }
 
-func (st *SmartToken) GetSubtokensWithDepth(token string, depth int) map[string]bool {
+func (st *SmartToken) getSubtokensWithDepth(token string, tokens map[string]bool) {
 	st.flush()
-	subTokens := make(map[string]bool)
-	cb := makeCircularBuffer(depth + 1)
+	cb := makeCircularBuffer(st.getDepth(len(token)) + 1)
 	for index, r := range token {
 		if st.pushRune(r) {
 			cb.push(index)
 			if cb.full() {
 				left, rightArray := cb.extract()
 				for _, right := range rightArray {
-					subTokens[token[left:right]] = true
+					tokens[token[left:right]] = true
 				}
 			}
 		}
@@ -79,9 +107,39 @@ func (st *SmartToken) GetSubtokensWithDepth(token string, depth int) map[string]
 	for !cb.empty() {
 		left, rightArray := cb.extract()
 		for _, right := range rightArray {
-			subTokens[token[left:right]] = true
+			tokens[token[left:right]] = true
 		}
 		cb.pop()
 	}
-	return subTokens
+}
+
+// TokenizeString starts SmartToken tokenization process on a string.
+func (st *SmartToken) TokenizeString(source string) map[string]bool {
+	tokens := make(map[string]bool)
+
+	const stateSpace = 0
+	const stateToken = 1
+
+	offset := 0
+	state := stateSpace
+	for index, r := range source {
+		switch state {
+		case stateSpace:
+			if !unicode.IsSpace(r) {
+				state = stateToken
+				offset = index
+			}
+			break
+		case stateToken:
+			if unicode.IsSpace(r) {
+				state = stateSpace
+				st.getSubtokensWithDepth(source[offset:index], tokens)
+			}
+			break
+		}
+	}
+	if state == stateToken {
+		st.getSubtokensWithDepth(source[offset:], tokens)
+	}
+	return tokens
 }
