@@ -5,28 +5,9 @@ import (
 	"reflect"
 	"testing"
 	"unicode"
+
+	"github.com/rvncerr/goassert"
 )
-
-type TestingT interface {
-	Errorf(format string, args ...interface{})
-}
-
-type GoAssert struct {
-	t TestingT
-}
-
-func New(t TestingT) *GoAssert {
-	return &GoAssert{
-		t: t,
-	}
-}
-
-func (ga *GoAssert) Assert(value bool, message string) bool {
-	if value != true {
-		ga.t.Errorf(message)
-	}
-	return value
-}
 
 func TestGetDepth(t *testing.T) {
 
@@ -35,7 +16,7 @@ func TestGetDepth(t *testing.T) {
 	const rightX = 120
 	const rightY = 10
 
-	ga := New(t)
+	ga := goassert.New(t)
 
 	var st SmartToken
 	st.SetDepthPolicy(leftX, leftY, rightX, rightY)
@@ -61,7 +42,7 @@ type tokenizerTestSet struct {
 }
 
 func TestTokenizeString(t *testing.T) {
-	ga := New(t)
+	ga := goassert.New(t)
 
 	var st SmartToken
 	st.AddRangeTable(unicode.Latin)
