@@ -3,6 +3,8 @@ package gotoken
 import (
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/rvncerr/gocircular"
 )
 
 const runeClassUndef = -1
@@ -105,27 +107,29 @@ func (st *SmartToken) pushRune(r rune) bool {
 
 func (st *SmartToken) getSubtokens(token string, tokens map[string]int, distribution map[int]int) {
 	st.flush()
-	cb := makeCircularBuffer(st.getDepth(utf8.RuneCountInString(token)) + 1)
+	cb := gocircular.NewCircularBuffer(st.getDepth(utf8.RuneCountInString(token)) + 1)
 	for index, r := range token {
 		if st.pushRune(r) {
-			cb.push(index)
-			if cb.full() {
-				left, rightArray := cb.extract()
-				for depth, right := range rightArray {
-					tokens[token[left:right]] = depth
+			cb.Push(index)
+			if cb.Full() {
+				array := cb.ToArray()
+				left := cb.Head()
+				for depth, right := range array[1:] {
+					tokens[token[left.(int):right.(int)]] = depth
 					distribution[depth]++
 				}
 			}
 		}
 	}
-	cb.push(len(token))
-	for !cb.empty() {
-		left, rightArray := cb.extract()
-		for depth, right := range rightArray {
-			tokens[token[left:right]] = depth
+	cb.Push(len(token))
+	for !cb.Empty() {
+		array := cb.ToArray()
+		left := cb.Head()
+		for depth, right := range array[1:] {
+			tokens[token[left.(int):right.(int)]] = depth
 			distribution[depth]++
 		}
-		cb.pop()
+		cb.Pop()
 	}
 }
 
