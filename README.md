@@ -1,1 +1,1 @@
-# gotoken
+# gotoken — Tokenization for Go
