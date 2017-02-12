@@ -6,35 +6,8 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/rvncerr/goassert"
+	"github.com/stretchr/testify/assert"
 )
-
-func TestGetDepth(t *testing.T) {
-
-	const leftX = 20
-	const leftY = 100
-	const rightX = 120
-	const rightY = 10
-
-	ga := goassert.New(t)
-
-	var st SmartToken
-	st.SetDepthPolicy(leftX, leftY, rightX, rightY)
-
-	for i := 1; i <= leftX; i++ {
-		ga.Assert(st.getDepth(i) == leftY, "depth policy left part")
-	}
-
-	memory := leftY
-	for i := leftX + 1; i <= rightX; i++ {
-		ga.Assert(st.getDepth(i) <= memory, "depth policy middle part")
-		memory = st.getDepth(i)
-	}
-
-	for i := rightX; i <= rightX+20; i++ {
-		ga.Assert(st.getDepth(i) == rightY, "depth policy right part")
-	}
-}
 
 type tokenizerTestSet struct {
 	input  string
@@ -42,14 +15,14 @@ type tokenizerTestSet struct {
 }
 
 func runTokenizerTestSetDepth(testSet []tokenizerTestSet, t *testing.T) {
-	ga := goassert.New(t)
-	var st SmartToken
+	assert := assert.New(t)
+	st := NewDepthTokenizer(10, 10, 18, 2)
 	st.AddRangeTable(unicode.Latin)
 	st.AddRangeTable(unicode.Cyrillic)
-	st.SetDepthPolicy(10, 10, 18, 2)
+
 	for _, test := range testSet {
 		result := st.TokenizeString(test.input)
-		ga.Assert(reflect.DeepEqual(result, test.output), fmt.Sprintf("wrong tokenization of '%v' -> %v", test.input, result))
+		assert.True(reflect.DeepEqual(result, test.output), fmt.Sprintf("wrong tokenization of '%v' -> %v", test.input, result))
 	}
 }
 
