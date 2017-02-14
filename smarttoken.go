@@ -21,6 +21,7 @@ const (
 // SmartTokenInfo provides basic information about the token.
 type SmartTokenInfo struct {
 	DetectedLanguage int
+	DetectedBase     [2]int
 }
 
 // SmartToken is a tokenizer for SmartToken algorithm.
@@ -33,50 +34,54 @@ type SmartToken struct {
 	policy                  TokenizationPolicy
 }
 
-func (st *SmartToken) detectLanguage(rc []interface{}, rt []interface{}) int {
+func (st *SmartToken) detectBase(bs []interface{}, left int, right int) [2]int {
+	return [2]int{bs[left].(int) - bs[0].(int), bs[right].(int) - bs[0].(int)}
+}
+
+func (st *SmartToken) detectLanguage(bs []interface{}, rc []interface{}, rt []interface{}) (int, [2]int) {
 	// fmt.Printf("%v %v\n", rc, rt)
 	length := len(rc)
 	switch {
 	case length == 1:
 		if rc[0] == Letter {
-			return rt[0].(int) // "hello", "привет"
+			return rt[0].(int), st.detectBase(bs, 0, 1) // "hello", "привет"
 		}
-		return -1 // "123"
+		return -1, [2]int{0, 0} // "123"
 	case length == 2:
 		switch {
 		case rc[0] == Letter && rc[1] == Letter:
-			return rt[1].(int) // "mailка"
+			return rt[1].(int), st.detectBase(bs, 0, 2) // "mailка"
 		case rc[0] == Letter && rc[1] != Letter:
-			return rt[0].(int) // "привет---"
+			return rt[0].(int), st.detectBase(bs, 0, 1) // "привет---"
 		case rc[0] != Letter && rc[1] == Letter:
-			return rt[1].(int) // "---привет"
+			return rt[1].(int), st.detectBase(bs, 1, 2) // "---привет"
 		default:
-			return -1 // "---123"
+			return -1, [2]int{0, 0} // "---123"
 		}
 	case length == 3:
 		switch {
 		case rc[0] == Letter && rc[1] == Letter && rc[2] == Letter:
-			return -1 // "mailприветhello"
+			return -1, [2]int{0, 0} // "mailприветhello"
 		case rc[0] == Letter && rc[1] == Letter && rc[2] != Letter:
-			return rt[1].(int) // "mailка---"
+			return rt[1].(int), st.detectBase(bs, 0, 2) // "mailка---"
 		case rc[0] == Letter && rc[1] != Letter && rc[2] == Letter:
 			if rt[0] == rt[2] {
-				return rt[2].(int) // "карабас-барабас"
+				return rt[2].(int), st.detectBase(bs, 0, 3) // "карабас-барабас"
 			}
-			return rt[2].(int) // "css-стили"
+			return rt[2].(int), st.detectBase(bs, 2, 3) // "css-стили"
 		case rc[0] != Letter && rc[1] == Letter && rc[2] == Letter:
-			return rt[2].(int) // "---mailка"
+			return rt[2].(int), st.detectBase(bs, 2, 3) // "---mailка"
 		case rc[0] == Letter && rc[1] != Letter && rc[2] != Letter:
-			return rt[0].(int) // "привет---123"
+			return rt[0].(int), st.detectBase(bs, 0, 1) // "привет---123"
 		case rc[0] != Letter && rc[1] == Letter && rc[2] != Letter:
-			return rt[1].(int) // "---привет---"
+			return rt[1].(int), st.detectBase(bs, 1, 2) // "---привет---"
 		case rc[0] != Letter && rc[1] != Letter && rc[2] == Letter:
-			return rt[2].(int) // "123---привет"
+			return rt[2].(int), st.detectBase(bs, 2, 3) // "123---привет"
 		default:
-			return -1 // "123---123"
+			return -1, [2]int{0, 0} // "123---123"
 		}
 	default:
-		return -1
+		return -1, [2]int{0, 0}
 	}
 }
 
@@ -152,7 +157,8 @@ func (st *SmartToken) getSubtokens(token string, tokens map[string]SmartTokenInf
 				left := blockSizeBuffer.Front()
 				for depth, right := range array[1:] {
 					var info SmartTokenInfo
-					info.DetectedLanguage = st.detectLanguage(runeClassBuffer.ToArray()[0:depth+1], rangeTableBuffer.ToArray()[0:depth+1])
+					info.DetectedLanguage, info.DetectedBase =
+						st.detectLanguage(array, runeClassBuffer.ToArray()[0:depth+1], rangeTableBuffer.ToArray()[0:depth+1])
 					tokens[token[left.(int):right.(int)]] = info
 				}
 			}
@@ -174,7 +180,8 @@ func (st *SmartToken) getSubtokens(token string, tokens map[string]SmartTokenInf
 		left := blockSizeBuffer.Front()
 		for depth, right := range array[1:] {
 			var info SmartTokenInfo
-			info.DetectedLanguage = st.detectLanguage(runeClassBuffer.ToArray()[0:depth+1], rangeTableBuffer.ToArray()[0:depth+1])
+			info.DetectedLanguage, info.DetectedBase =
+				st.detectLanguage(array, runeClassBuffer.ToArray()[0:depth+1], rangeTableBuffer.ToArray()[0:depth+1])
 			tokens[token[left.(int):right.(int)]] = info
 		}
 		blockSizeBuffer.PopFront()
