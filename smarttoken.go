@@ -18,12 +18,66 @@ const (
 	Other
 )
 
+// SmartTokenInfo provides basic information about the token.
+type SmartTokenInfo struct {
+	DetectedLanguage int
+}
+
 // SmartToken is a tokenizer for SmartToken algorithm.
 type SmartToken struct {
-	rangeTableList  []*unicode.RangeTable
-	rangeTableIndex int
-	runeClass       RuneClass
-	policy          TokenizationPolicy
+	rangeTableList          []*unicode.RangeTable
+	previousRangeTableIndex int
+	currentRangeTableIndex  int
+	previousRuneClass       RuneClass
+	currentRuneClass        RuneClass
+	policy                  TokenizationPolicy
+}
+
+func (st *SmartToken) detectLanguage(rc []interface{}, rt []interface{}) int {
+	// fmt.Printf("%v %v\n", rc, rt)
+	length := len(rc)
+	switch {
+	case length == 1:
+		if rc[0] == Letter {
+			return rt[0].(int) // "hello", "привет"
+		}
+		return -1 // "123"
+	case length == 2:
+		switch {
+		case rc[0] == Letter && rc[1] == Letter:
+			return rt[1].(int) // "mailка"
+		case rc[0] == Letter && rc[1] != Letter:
+			return rt[0].(int) // "привет---"
+		case rc[0] != Letter && rc[1] == Letter:
+			return rt[1].(int) // "---привет"
+		default:
+			return -1 // "---123"
+		}
+	case length == 3:
+		switch {
+		case rc[0] == Letter && rc[1] == Letter && rc[2] == Letter:
+			return -1 // "mailприветhello"
+		case rc[0] == Letter && rc[1] == Letter && rc[2] != Letter:
+			return rt[1].(int) // "mailка---"
+		case rc[0] == Letter && rc[1] != Letter && rc[2] == Letter:
+			if rt[0] == rt[2] {
+				return rt[2].(int) // "карабас-барабас"
+			}
+			return rt[2].(int) // "css-стили"
+		case rc[0] != Letter && rc[1] == Letter && rc[2] == Letter:
+			return rt[2].(int) // "---mailка"
+		case rc[0] == Letter && rc[1] != Letter && rc[2] != Letter:
+			return rt[0].(int) // "привет---123"
+		case rc[0] != Letter && rc[1] == Letter && rc[2] != Letter:
+			return rt[1].(int) // "---привет---"
+		case rc[0] != Letter && rc[1] != Letter && rc[2] == Letter:
+			return rt[2].(int) // "123---привет"
+		default:
+			return -1 // "123---123"
+		}
+	default:
+		return -1
+	}
 }
 
 func NewDepthTokenizer(maxLength int, maxDepth int, minLength int, minDepth int) *SmartToken {
@@ -44,9 +98,9 @@ func (st *SmartToken) SetPolicy(p TokenizationPolicy) {
 }
 
 // TokenizeString starts SmartToken tokenization process on a string.
-func (st *SmartToken) TokenizeString(source string) map[string]int {
-	tokens := make(map[string]int)    // Token -> Depth.
-	distribution := make(map[int]int) // Depth -> Count(Token).
+func (st *SmartToken) TokenizeString(source string) map[string]SmartTokenInfo {
+	tokens := make(map[string]SmartTokenInfo) // Token -> Info.
+	// distribution := make(map[int]int) // Depth -> Count(Token).
 
 	const stateSpace = 0
 	const stateToken = 1
@@ -64,65 +118,103 @@ func (st *SmartToken) TokenizeString(source string) map[string]int {
 		case stateToken:
 			if unicode.IsSpace(r) {
 				state = stateSpace
-				st.getSubtokens(source[offset:index], tokens, distribution)
+				st.getSubtokens(source[offset:index], tokens)
 			}
 			break
 		}
 	}
 	if state == stateToken {
-		st.getSubtokens(source[offset:], tokens, distribution)
+		st.getSubtokens(source[offset:], tokens)
 	}
 	return tokens
 }
 
-func (st *SmartToken) getSubtokens(token string, tokens map[string]int, distribution map[int]int) {
+func (st *SmartToken) getSubtokens(token string, tokens map[string]SmartTokenInfo) {
 	st.flush()
 	depth := st.policy.GetDepth(utf8.RuneCountInString(token)) + 1
-	cb := gocontainers.NewCircularBuffer(depth)
+	blockSizeBuffer := gocontainers.NewCircularBuffer(depth)
+	runeClassBuffer := gocontainers.NewCircularBuffer(depth - 1)
+	rangeTableBuffer := gocontainers.NewCircularBuffer(depth - 1)
+
 	for index, r := range token {
 		if st.pushRune(r) {
-			cb.PushBack(index)
-			if cb.Full() {
-				array := cb.ToArray()
-				left := cb.Front()
+			blockSizeBuffer.PushBack(index)
+			if st.previousRuneClass != Undef {
+				runeClassBuffer.PushBack(st.previousRuneClass)
+				if st.previousRuneClass == Letter {
+					rangeTableBuffer.PushBack(st.previousRangeTableIndex)
+				} else {
+					rangeTableBuffer.PushBack(-1)
+				}
+			}
+			if blockSizeBuffer.Full() {
+				array := blockSizeBuffer.ToArray()
+				left := blockSizeBuffer.Front()
 				for depth, right := range array[1:] {
-					tokens[token[left.(int):right.(int)]] = depth
-					distribution[depth]++
+					var info SmartTokenInfo
+					info.DetectedLanguage = st.detectLanguage(runeClassBuffer.ToArray()[0:depth+1], rangeTableBuffer.ToArray()[0:depth+1])
+					tokens[token[left.(int):right.(int)]] = info
 				}
 			}
 		}
 	}
 
-	cb.PushBack(len(token))
-	for !cb.Empty() {
-		array := cb.ToArray()
-		left := cb.Front()
+	blockSizeBuffer.PushBack(len(token))
+	runeClassBuffer.PushBack(st.currentRuneClass)
+	if st.currentRuneClass == Letter {
+		rangeTableBuffer.PushBack(st.currentRangeTableIndex)
+	} else {
+		rangeTableBuffer.PushBack(-1)
+	}
+
+	// fmt.Printf("token = %v, bs = %v, rc = %v, rt = %v\n", token, blockSizeBuffer.ToArray(), runeClassBuffer.ToArray(), rangeTableBuffer.ToArray())
+
+	for !blockSizeBuffer.Empty() {
+		array := blockSizeBuffer.ToArray()
+		left := blockSizeBuffer.Front()
 		for depth, right := range array[1:] {
-			tokens[token[left.(int):right.(int)]] = depth
-			distribution[depth]++
+			var info SmartTokenInfo
+			info.DetectedLanguage = st.detectLanguage(runeClassBuffer.ToArray()[0:depth+1], rangeTableBuffer.ToArray()[0:depth+1])
+			tokens[token[left.(int):right.(int)]] = info
 		}
-		cb.PopFront()
+		blockSizeBuffer.PopFront()
+		runeClassBuffer.PopFront()
+		rangeTableBuffer.PopFront()
 	}
 }
 
 func (st *SmartToken) flush() {
-	st.runeClass = Undef
-	st.rangeTableIndex = -1
+	st.previousRuneClass = Undef
+	st.currentRuneClass = Undef
+	st.previousRangeTableIndex = -1
+	st.currentRangeTableIndex = -1
 }
 
+// very dirty!!!
 func (st *SmartToken) pushRune(r rune) bool {
 	result := false
 	newRuneClass := st.getRuneClass(r)
 
 	if newRuneClass == Letter {
 		newRangeTableIndex := st.getTableIndex(r)
-		if newRangeTableIndex != st.rangeTableIndex {
-			st.rangeTableIndex = newRangeTableIndex
+		if newRangeTableIndex != st.currentRangeTableIndex {
+			st.previousRangeTableIndex = st.currentRangeTableIndex
+			st.currentRangeTableIndex = newRangeTableIndex
+			st.previousRuneClass = st.currentRuneClass
+			st.currentRuneClass = newRuneClass
+			result = true
+		} else if newRuneClass != st.currentRuneClass {
+			st.previousRangeTableIndex = st.currentRangeTableIndex
+			st.currentRangeTableIndex = -1
+			st.previousRuneClass = st.currentRuneClass
+			st.currentRuneClass = newRuneClass
 			result = true
 		}
-	}
-	if newRuneClass != st.runeClass {
-		st.runeClass = newRuneClass
+	} else if newRuneClass != st.currentRuneClass {
+		st.previousRangeTableIndex = st.currentRangeTableIndex
+		st.currentRangeTableIndex = -1
+		st.previousRuneClass = st.currentRuneClass
+		st.currentRuneClass = newRuneClass
 		result = true
 	}
 	return result

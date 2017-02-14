@@ -11,7 +11,7 @@ import (
 
 type tokenizerTestSet struct {
 	input  string
-	output map[string]int
+	output map[string]SmartTokenInfo
 }
 
 func runTokenizerTestSetDepth(testSet []tokenizerTestSet, t *testing.T) {
@@ -30,15 +30,15 @@ func TestTokenizerSimple(t *testing.T) {
 	testSet := []tokenizerTestSet{
 		tokenizerTestSet{
 			input: "hello", // Single word.
-			output: map[string]int{
-				"hello": 0,
+			output: map[string]SmartTokenInfo{
+				"hello": SmartTokenInfo{DetectedLanguage: 0},
 			},
 		},
 		tokenizerTestSet{
 			input: "hello world", // Token separation.
-			output: map[string]int{
-				"hello": 0,
-				"world": 0,
+			output: map[string]SmartTokenInfo{
+				"hello": SmartTokenInfo{DetectedLanguage: 0},
+				"world": SmartTokenInfo{DetectedLanguage: 0},
 			},
 		},
 	}
@@ -49,122 +49,122 @@ func TestTokenizerTransitions(t *testing.T) {
 	testSet := []tokenizerTestSet{
 		tokenizerTestSet{ // KnownLanguage -> KnownLanguage.
 			input: "helloпривет",
-			output: map[string]int{
-				"hello":       0,
-				"привет":      0,
-				"helloпривет": 1,
+			output: map[string]SmartTokenInfo{
+				"hello":       SmartTokenInfo{DetectedLanguage: 0},
+				"привет":      SmartTokenInfo{DetectedLanguage: 1},
+				"helloпривет": SmartTokenInfo{DetectedLanguage: 1},
 			},
 		},
 		tokenizerTestSet{ // KnownLanguage -> UnknownLanguage.
 			input: "hello你好",
-			output: map[string]int{
-				"hello":   0,
-				"你好":      0,
-				"hello你好": 1,
+			output: map[string]SmartTokenInfo{
+				"hello":   SmartTokenInfo{DetectedLanguage: 0},
+				"你好":      SmartTokenInfo{DetectedLanguage: -1},
+				"hello你好": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 		tokenizerTestSet{ // UnknownLanguage -> KnownLanguage.
 			input: "你好привет",
-			output: map[string]int{
-				"你好":       0,
-				"привет":   0,
-				"你好привет": 1,
+			output: map[string]SmartTokenInfo{
+				"你好":       SmartTokenInfo{DetectedLanguage: -1},
+				"привет":   SmartTokenInfo{DetectedLanguage: 1},
+				"你好привет": SmartTokenInfo{DetectedLanguage: 1},
 			},
 		},
 		tokenizerTestSet{
 			input: "hello123", // Language -> Number.
-			output: map[string]int{
-				"hello":    0,
-				"123":      0,
-				"hello123": 1,
+			output: map[string]SmartTokenInfo{
+				"hello":    SmartTokenInfo{DetectedLanguage: 0},
+				"123":      SmartTokenInfo{DetectedLanguage: -1},
+				"hello123": SmartTokenInfo{DetectedLanguage: 0},
 			},
 		},
 		tokenizerTestSet{
 			input: "hello...", // Language -> Delimiter.
-			output: map[string]int{
-				"hello":    0,
-				"...":      0,
-				"hello...": 1,
+			output: map[string]SmartTokenInfo{
+				"hello":    SmartTokenInfo{DetectedLanguage: 0},
+				"...":      SmartTokenInfo{DetectedLanguage: -1},
+				"hello...": SmartTokenInfo{DetectedLanguage: 0},
 			},
 		},
 		tokenizerTestSet{
 			input: "hello☭", // Language -> Other.
-			output: map[string]int{
-				"hello":  0,
-				"☭":      0,
-				"hello☭": 1,
+			output: map[string]SmartTokenInfo{
+				"hello":  SmartTokenInfo{DetectedLanguage: 0},
+				"☭":      SmartTokenInfo{DetectedLanguage: -1},
+				"hello☭": SmartTokenInfo{DetectedLanguage: 0},
 			},
 		},
 		tokenizerTestSet{
 			input: "123hello", // Number -> Language.
-			output: map[string]int{
-				"123":      0,
-				"hello":    0,
-				"123hello": 1,
+			output: map[string]SmartTokenInfo{
+				"123":      SmartTokenInfo{DetectedLanguage: -1},
+				"hello":    SmartTokenInfo{DetectedLanguage: 0},
+				"123hello": SmartTokenInfo{DetectedLanguage: 0},
 			},
 		},
 		tokenizerTestSet{
 			input: "123...", // Number -> Delimiter.
-			output: map[string]int{
-				"123":    0,
-				"...":    0,
-				"123...": 1,
+			output: map[string]SmartTokenInfo{
+				"123":    SmartTokenInfo{DetectedLanguage: -1},
+				"...":    SmartTokenInfo{DetectedLanguage: -1},
+				"123...": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 		tokenizerTestSet{
 			input: "123☭", // Number -> Other.
-			output: map[string]int{
-				"123":  0,
-				"☭":    0,
-				"123☭": 1,
+			output: map[string]SmartTokenInfo{
+				"123":  SmartTokenInfo{DetectedLanguage: -1},
+				"☭":    SmartTokenInfo{DetectedLanguage: -1},
+				"123☭": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 		tokenizerTestSet{
 			input: "...hello", // Delimiter -> Language.
-			output: map[string]int{
-				"...":      0,
-				"hello":    0,
-				"...hello": 1,
+			output: map[string]SmartTokenInfo{
+				"...":      SmartTokenInfo{DetectedLanguage: -1},
+				"hello":    SmartTokenInfo{DetectedLanguage: 0},
+				"...hello": SmartTokenInfo{DetectedLanguage: 0},
 			},
 		},
 		tokenizerTestSet{
 			input: "...123", // Delimiter -> Number.
-			output: map[string]int{
-				"...":    0,
-				"123":    0,
-				"...123": 1,
+			output: map[string]SmartTokenInfo{
+				"...":    SmartTokenInfo{DetectedLanguage: -1},
+				"123":    SmartTokenInfo{DetectedLanguage: -1},
+				"...123": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 		tokenizerTestSet{
 			input: "...☭", // Delimiter -> Other.
-			output: map[string]int{
-				"...":  0,
-				"☭":    0,
-				"...☭": 1,
+			output: map[string]SmartTokenInfo{
+				"...":  SmartTokenInfo{DetectedLanguage: -1},
+				"☭":    SmartTokenInfo{DetectedLanguage: -1},
+				"...☭": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 		tokenizerTestSet{
 			input: "☭hello", // Other -> Language.
-			output: map[string]int{
-				"☭":      0,
-				"hello":  0,
-				"☭hello": 1,
+			output: map[string]SmartTokenInfo{
+				"☭":      SmartTokenInfo{DetectedLanguage: -1},
+				"hello":  SmartTokenInfo{DetectedLanguage: 0},
+				"☭hello": SmartTokenInfo{DetectedLanguage: 0},
 			},
 		},
 		tokenizerTestSet{
 			input: "☭123", // Other -> Number.
-			output: map[string]int{
-				"☭":    0,
-				"123":  0,
-				"☭123": 1,
+			output: map[string]SmartTokenInfo{
+				"☭":    SmartTokenInfo{DetectedLanguage: -1},
+				"123":  SmartTokenInfo{DetectedLanguage: -1},
+				"☭123": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 		tokenizerTestSet{
 			input: "☭...", // Other -> Delimiter.
-			output: map[string]int{
-				"☭":    0,
-				"...":  0,
-				"☭...": 1,
+			output: map[string]SmartTokenInfo{
+				"☭":    SmartTokenInfo{DetectedLanguage: -1},
+				"...":  SmartTokenInfo{DetectedLanguage: -1},
+				"☭...": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 	}
@@ -175,28 +175,28 @@ func TestTokenizerLanguages(t *testing.T) {
 	testSet := []tokenizerTestSet{
 		tokenizerTestSet{ // Similar language separation.
 			input: "aаaа",
-			output: map[string]int{
-				"a":    0,
-				"а":    0,
-				"aа":   1,
-				"аa":   1,
-				"aаa":  2,
-				"аaа":  2,
-				"aаaа": 3,
+			output: map[string]SmartTokenInfo{
+				"a":    SmartTokenInfo{DetectedLanguage: 0},
+				"а":    SmartTokenInfo{DetectedLanguage: 1},
+				"aа":   SmartTokenInfo{DetectedLanguage: 1},
+				"аa":   SmartTokenInfo{DetectedLanguage: 0},
+				"aаa":  SmartTokenInfo{DetectedLanguage: -1},
+				"аaа":  SmartTokenInfo{DetectedLanguage: -1},
+				"aаaа": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 		tokenizerTestSet{
 			input: "你好。再见。", // Chinese punctuation.
-			output: map[string]int{
-				"你好":     0,
-				"再见":     0,
-				"。":      0,
-				"你好。":    1,
-				"再见。":    1,
-				"。再见":    1,
-				"你好。再见":  2,
-				"。再见。":   2,
-				"你好。再见。": 3,
+			output: map[string]SmartTokenInfo{
+				"你好":     SmartTokenInfo{DetectedLanguage: -1},
+				"再见":     SmartTokenInfo{DetectedLanguage: -1},
+				"。":      SmartTokenInfo{DetectedLanguage: -1},
+				"你好。":    SmartTokenInfo{DetectedLanguage: -1},
+				"再见。":    SmartTokenInfo{DetectedLanguage: -1},
+				"。再见":    SmartTokenInfo{DetectedLanguage: -1},
+				"你好。再见":  SmartTokenInfo{DetectedLanguage: -1},
+				"。再见。":   SmartTokenInfo{DetectedLanguage: -1},
+				"你好。再见。": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 	}
@@ -207,77 +207,77 @@ func TestTokenizerDepth(t *testing.T) {
 	testSet := []tokenizerTestSet{
 		tokenizerTestSet{
 			input: "a.b.c.d", // Left side.
-			output: map[string]int{
-				"a":       0,
-				"b":       0,
-				"c":       0,
-				"d":       0,
-				".":       0,
-				"a.":      1,
-				"b.":      1,
-				"c.":      1,
-				".b":      1,
-				".c":      1,
-				".d":      1,
-				"a.b":     2,
-				"b.c":     2,
-				"c.d":     2,
-				".b.":     2,
-				".c.":     2,
-				"a.b.":    3,
-				"b.c.":    3,
-				".b.c":    3,
-				".c.d":    3,
-				"a.b.c":   4,
-				"b.c.d":   4,
-				".b.c.":   4,
-				"a.b.c.":  5,
-				".b.c.d":  5,
-				"a.b.c.d": 6,
+			output: map[string]SmartTokenInfo{
+				"a":       SmartTokenInfo{DetectedLanguage: 0},
+				"b":       SmartTokenInfo{DetectedLanguage: 0},
+				"c":       SmartTokenInfo{DetectedLanguage: 0},
+				"d":       SmartTokenInfo{DetectedLanguage: 0},
+				".":       SmartTokenInfo{DetectedLanguage: -1},
+				"a.":      SmartTokenInfo{DetectedLanguage: 0},
+				"b.":      SmartTokenInfo{DetectedLanguage: 0},
+				"c.":      SmartTokenInfo{DetectedLanguage: 0},
+				".b":      SmartTokenInfo{DetectedLanguage: 0},
+				".c":      SmartTokenInfo{DetectedLanguage: 0},
+				".d":      SmartTokenInfo{DetectedLanguage: 0},
+				"a.b":     SmartTokenInfo{DetectedLanguage: 0},
+				"b.c":     SmartTokenInfo{DetectedLanguage: 0},
+				"c.d":     SmartTokenInfo{DetectedLanguage: 0},
+				".b.":     SmartTokenInfo{DetectedLanguage: 0},
+				".c.":     SmartTokenInfo{DetectedLanguage: 0},
+				"a.b.":    SmartTokenInfo{DetectedLanguage: -1},
+				"b.c.":    SmartTokenInfo{DetectedLanguage: -1},
+				".b.c":    SmartTokenInfo{DetectedLanguage: -1},
+				".c.d":    SmartTokenInfo{DetectedLanguage: -1},
+				"a.b.c":   SmartTokenInfo{DetectedLanguage: -1},
+				"b.c.d":   SmartTokenInfo{DetectedLanguage: -1},
+				".b.c.":   SmartTokenInfo{DetectedLanguage: -1},
+				"a.b.c.":  SmartTokenInfo{DetectedLanguage: -1},
+				".b.c.d":  SmartTokenInfo{DetectedLanguage: -1},
+				"a.b.c.d": SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 		tokenizerTestSet{
 			input: "aaa.bbb.ccc.ddd", // Middle side.
-			output: map[string]int{
-				"aaa":         0,
-				"bbb":         0,
-				"ccc":         0,
-				"ddd":         0,
-				".":           0,
-				"aaa.":        1,
-				"bbb.":        1,
-				"ccc.":        1,
-				".bbb":        1,
-				".ccc":        1,
-				".ddd":        1,
-				"aaa.bbb":     2,
-				"bbb.ccc":     2,
-				"ccc.ddd":     2,
-				".bbb.":       2,
-				".ccc.":       2,
-				"aaa.bbb.":    3,
-				"bbb.ccc.":    3,
-				".bbb.ccc":    3,
-				".ccc.ddd":    3,
-				"aaa.bbb.ccc": 4,
-				"bbb.ccc.ddd": 4,
-				".bbb.ccc.":   4,
+			output: map[string]SmartTokenInfo{
+				"aaa":         SmartTokenInfo{DetectedLanguage: 0},
+				"bbb":         SmartTokenInfo{DetectedLanguage: 0},
+				"ccc":         SmartTokenInfo{DetectedLanguage: 0},
+				"ddd":         SmartTokenInfo{DetectedLanguage: 0},
+				".":           SmartTokenInfo{DetectedLanguage: -1},
+				"aaa.":        SmartTokenInfo{DetectedLanguage: 0},
+				"bbb.":        SmartTokenInfo{DetectedLanguage: 0},
+				"ccc.":        SmartTokenInfo{DetectedLanguage: 0},
+				".bbb":        SmartTokenInfo{DetectedLanguage: 0},
+				".ccc":        SmartTokenInfo{DetectedLanguage: 0},
+				".ddd":        SmartTokenInfo{DetectedLanguage: 0},
+				"aaa.bbb":     SmartTokenInfo{DetectedLanguage: 0},
+				"bbb.ccc":     SmartTokenInfo{DetectedLanguage: 0},
+				"ccc.ddd":     SmartTokenInfo{DetectedLanguage: 0},
+				".bbb.":       SmartTokenInfo{DetectedLanguage: 0},
+				".ccc.":       SmartTokenInfo{DetectedLanguage: 0},
+				"aaa.bbb.":    SmartTokenInfo{DetectedLanguage: -1},
+				"bbb.ccc.":    SmartTokenInfo{DetectedLanguage: -1},
+				".bbb.ccc":    SmartTokenInfo{DetectedLanguage: -1},
+				".ccc.ddd":    SmartTokenInfo{DetectedLanguage: -1},
+				"aaa.bbb.ccc": SmartTokenInfo{DetectedLanguage: -1},
+				"bbb.ccc.ddd": SmartTokenInfo{DetectedLanguage: -1},
+				".bbb.ccc.":   SmartTokenInfo{DetectedLanguage: -1},
 			},
 		},
 		tokenizerTestSet{
 			input: "aaa...bbb...ccc...ddd", // Right side.
-			output: map[string]int{
-				"aaa":    0,
-				"bbb":    0,
-				"ccc":    0,
-				"ddd":    0,
-				"...":    0,
-				"aaa...": 1,
-				"bbb...": 1,
-				"ccc...": 1,
-				"...bbb": 1,
-				"...ccc": 1,
-				"...ddd": 1,
+			output: map[string]SmartTokenInfo{
+				"aaa":    SmartTokenInfo{DetectedLanguage: 0},
+				"bbb":    SmartTokenInfo{DetectedLanguage: 0},
+				"ccc":    SmartTokenInfo{DetectedLanguage: 0},
+				"ddd":    SmartTokenInfo{DetectedLanguage: 0},
+				"...":    SmartTokenInfo{DetectedLanguage: -1},
+				"aaa...": SmartTokenInfo{DetectedLanguage: 0},
+				"bbb...": SmartTokenInfo{DetectedLanguage: 0},
+				"ccc...": SmartTokenInfo{DetectedLanguage: 0},
+				"...bbb": SmartTokenInfo{DetectedLanguage: 0},
+				"...ccc": SmartTokenInfo{DetectedLanguage: 0},
+				"...ddd": SmartTokenInfo{DetectedLanguage: 0},
 			},
 		},
 	}
