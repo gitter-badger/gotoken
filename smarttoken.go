@@ -31,7 +31,7 @@ type SmartToken struct {
 	currentRangeTableIndex  int
 	previousRuneClass       RuneClass
 	currentRuneClass        RuneClass
-	policy                  TokenizationPolicy
+	policy                  SmartTokenPolicy
 }
 
 func (st *SmartToken) detectBase(bs []interface{}, left int, right int) [2]int {
@@ -98,7 +98,7 @@ func (st *SmartToken) AddRangeTable(rt *unicode.RangeTable) {
 }
 
 // SetPolicy tells tokenizer how to calculate token sizes
-func (st *SmartToken) SetPolicy(p TokenizationPolicy) {
+func (st *SmartToken) SetPolicy(p SmartTokenPolicy) {
 	st.policy = p
 }
 

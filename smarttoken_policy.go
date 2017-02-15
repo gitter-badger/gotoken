@@ -1,5 +1,5 @@
 package gotoken
 
-type TokenizationPolicy interface {
+type SmartTokenPolicy interface {
 	GetDepth(length int) int
 }

@@ -2,7 +2,7 @@ package gotoken
 
 type PolicyCount int
 
-func NewPolicyCount(max int) TokenizationPolicy {
+func NewPolicyCount(max int) SmartTokenPolicy {
 	return nil
 }
 

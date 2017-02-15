@@ -7,7 +7,7 @@ type PolicyDepth struct {
 	minDepth  int
 }
 
-func NewPolicyDepth(maxLength int, maxDepth int, minLength int, minDepth int) TokenizationPolicy {
+func NewPolicyDepth(maxLength int, maxDepth int, minLength int, minDepth int) SmartTokenPolicy {
 	return &PolicyDepth{
 		maxLength: maxLength,
 		maxDepth:  maxDepth,
